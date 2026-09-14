@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   FlatList,
   ImageBackground,
   KeyboardAvoidingView,
@@ -12,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -28,15 +30,24 @@ const DARK_TEXT_MUTED = '#5b5b5b';
 export default function ListsScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { lists, createList, deleteList } = useLists();
+  const { lists, createList, archiveList } = useLists();
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<ListKind>('travel');
   const [customIcon, setCustomIcon] = useState(DEFAULT_CUSTOM_ICON);
+  const [creating, setCreating] = useState(false);
 
   const handleCreate = async () => {
     if (!title.trim()) return;
-    await createList(title.trim(), kind, kind === 'custom' ? customIcon : null);
+    setCreating(true);
+    const error = await createList(title.trim(), kind, kind === 'custom' ? customIcon : null);
+    setCreating(false);
+
+    if (error) {
+      Alert.alert('Could not create list', error.message ?? 'Something went wrong.');
+      return;
+    }
+
     setTitle('');
     setKind('travel');
     setCustomIcon(DEFAULT_CUSTOM_ICON);
@@ -74,20 +85,32 @@ export default function ListsScreen() {
     );
 
     return (
-      <Pressable onPress={() => router.push(`/list/${item.id}`)} onLongPress={() => deleteList(item.id)}>
-        {hasImage ? (
-          <ImageBackground
-            source={{ uri: getListBackgroundImageUrl(item.background_image_path!) }}
-            style={styles.cardImageBackground}
-            imageStyle={styles.cardImage}
-            resizeMode="cover"
-          >
-            {cardInner}
-          </ImageBackground>
-        ) : (
-          cardInner
+      <Swipeable
+        renderRightActions={() => (
+          <Pressable onPress={() => archiveList(item.id)} style={styles.archiveAction}>
+            <Ionicons name="archive-outline" size={20} color="#fff" />
+            <ThemedText type="small" style={{ color: '#fff', marginTop: 2 }}>
+              Archive
+            </ThemedText>
+          </Pressable>
         )}
-      </Pressable>
+        overshootRight={false}
+      >
+        <Pressable onPress={() => router.push(`/list/${item.id}`)}>
+          {hasImage ? (
+            <ImageBackground
+              source={{ uri: getListBackgroundImageUrl(item.background_image_path!) }}
+              style={styles.cardImageBackground}
+              imageStyle={styles.cardImage}
+              resizeMode="cover"
+            >
+              {cardInner}
+            </ImageBackground>
+          ) : (
+            cardInner
+          )}
+        </Pressable>
+      </Swipeable>
     );
   };
 
@@ -97,12 +120,20 @@ export default function ListsScreen() {
         <ThemedText type="title" style={{ fontSize: 34, lineHeight: 40 }}>
           Lists
         </ThemedText>
-        <Pressable
-          onPress={() => setModalVisible(true)}
-          style={[styles.addButton, { backgroundColor: theme.accent }]}
-        >
-          <Ionicons name="add" size={26} color="#fff" />
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+          <Pressable
+            onPress={() => router.push('/archive')}
+            style={[styles.addButton, { backgroundColor: theme.backgroundElement }]}
+          >
+            <Ionicons name="archive-outline" size={20} color={theme.text} />
+          </Pressable>
+          <Pressable
+            onPress={() => setModalVisible(true)}
+            style={[styles.addButton, { backgroundColor: theme.accent }]}
+          >
+            <Ionicons name="add" size={26} color="#fff" />
+          </Pressable>
+        </View>
       </View>
 
       <FlatList
@@ -113,7 +144,8 @@ export default function ListsScreen() {
         ListEmptyComponent={
           <ThemedView style={styles.empty}>
             <ThemedText themeColor="textSecondary">
-              No lists yet. Tap + to create a travel checklist or grocery list.
+              No lists yet. Tap + to create a travel checklist or grocery list. Swipe a list
+              left to archive it.
             </ThemedText>
           </ThemedView>
         }
@@ -252,6 +284,14 @@ const styles = StyleSheet.create({
   cardScrim: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  archiveAction: {
+    width: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E5484D',
+    borderRadius: 16,
+    marginLeft: Spacing.two,
   },
   iconCircle: {
     width: 36,

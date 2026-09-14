@@ -8,6 +8,7 @@ export interface ListRow {
   icon: string | null;
   background_color: string | null;
   background_image_path: string | null;
+  archived_at: string | null;
   created_at: string;
 }
 

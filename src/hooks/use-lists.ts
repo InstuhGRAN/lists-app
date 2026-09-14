@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 import type { ListKind, ListRow } from '@/types';
 
-export function useLists() {
+export function useLists(scope: 'active' | 'archived' = 'active') {
   const { session } = useAuth();
   const [lists, setLists] = useState<ListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -12,13 +12,12 @@ export function useLists() {
 
   const refresh = useCallback(async () => {
     if (!session) return;
-    const { data, error } = await supabase
-      .from('lists')
-      .select('*')
-      .order('created_at', { ascending: false });
+    let query = supabase.from('lists').select('*').order('created_at', { ascending: false });
+    query = scope === 'archived' ? query.not('archived_at', 'is', null) : query.is('archived_at', null);
+    const { data, error } = await query;
     if (!error && data) setLists(data as ListRow[]);
     setLoading(false);
-  }, [session]);
+  }, [session, scope]);
 
   useEffect(() => {
     refresh();
@@ -38,7 +37,7 @@ export function useLists() {
 
   const createList = useCallback(
     async (title: string, kind: ListKind, icon?: string | null) => {
-      if (!session) return;
+      if (!session) return { message: 'Not signed in.' };
       const { error } = await supabase
         .from('lists')
         .insert({ title, kind, icon: icon ?? null, user_id: session.user.id });
@@ -80,6 +79,27 @@ export function useLists() {
     [refresh],
   );
 
+  const archiveList = useCallback(
+    async (id: string) => {
+      const { error } = await supabase
+        .from('lists')
+        .update({ archived_at: new Date().toISOString() })
+        .eq('id', id);
+      if (!error) await refresh();
+      return error;
+    },
+    [refresh],
+  );
+
+  const restoreList = useCallback(
+    async (id: string) => {
+      const { error } = await supabase.from('lists').update({ archived_at: null }).eq('id', id);
+      if (!error) await refresh();
+      return error;
+    },
+    [refresh],
+  );
+
   const deleteList = useCallback(
     async (id: string) => {
       const { error } = await supabase.from('lists').delete().eq('id', id);
@@ -96,6 +116,8 @@ export function useLists() {
     updateListTitle,
     updateListIcon,
     updateListBackground,
+    archiveList,
+    restoreList,
     deleteList,
     refresh,
   };

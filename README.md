@@ -10,7 +10,10 @@ travel checklists and grocery lists, with cloud sync across devices.
   background, synced across devices.
 - **Custom icons**: Travel and Grocery lists have fixed icons; Custom lists let you pick one
   from an icon grid, at creation or later via the palette icon.
-- **Rename anytime**: the pencil icon on a list screen lets you rename it.
+- **Rename anytime**: tap the list name in its header to rename it (and change its icon, for
+  Custom lists).
+- **Archive**: swipe a list left on the Lists screen to archive it. The archive icon in the
+  header opens the Archive screen, where you can restore a list or delete it permanently.
 
 > **Add-by-voice is temporarily removed.** It used `expo-speech-recognition`, a native module
 > not bundled in Expo Go — having it installed made Expo Go refuse to open the project at all
@@ -34,7 +37,10 @@ travel checklists and grocery lists, with cloud sync across devices.
 4. Run a third query with the contents of
    [`supabase/003_list_icons.sql`](./supabase/003_list_icons.sql) — this adds the custom icon
    column for Custom lists.
-5. Go to **Project Settings → API** and copy the **Project URL** and **anon public** key.
+5. Run a fourth query with the contents of
+   [`supabase/004_list_archive.sql`](./supabase/004_list_archive.sql) — this adds archive
+   (soft-delete) support.
+6. Go to **Project Settings → API** and copy the **Project URL** and **anon public** key.
 
 ## 2. Configure environment variables
 
