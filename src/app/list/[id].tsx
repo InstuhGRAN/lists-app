@@ -39,8 +39,10 @@ const DARK_TEXT_MUTED = '#5b5b5b';
 type RowLayout = { y: number; height: number };
 
 // Given a row's rank among its siblings (after removing itself), find the Y
-// position it should sit at, using each sibling's ORIGINAL (pre-drag)
-// measured layout. Works with variable row heights.
+// position it should sit at. originalIds is the group's natural (pre-drag)
+// order, so slot `rank` in that order is exactly where an item now ranked
+// `rank` should visually land -- using whichever item originally sat there's
+// measured Y, regardless of which item that was.
 function targetYForRank(
   itemId: string,
   originalIds: string[],
@@ -48,16 +50,10 @@ function targetYForRank(
   rank: number,
 ) {
   'worklet';
-  const others: RowLayout[] = [];
-  for (const otherId of originalIds) {
-    if (otherId === itemId) continue;
-    const l = layout[otherId];
-    if (l) others.push(l);
-  }
-  if (others.length === 0) return layout[itemId]?.y ?? 0;
-  if (rank < others.length) return others[rank].y;
-  const last = others[others.length - 1];
-  return last.y + last.height;
+  const targetId = originalIds[rank];
+  const targetLayout = targetId ? layout[targetId] : undefined;
+  if (targetLayout) return targetLayout.y;
+  return layout[itemId]?.y ?? 0;
 }
 
 function ChecklistRow({
