@@ -141,10 +141,15 @@ export default function ListDetailScreen() {
           title: list?.title ?? '',
           headerTitleAlign: 'center',
           headerTitle: () => (
-            <Pressable onPress={openRenameModal} hitSlop={8}>
+            <Pressable
+              onPress={openRenameModal}
+              hitSlop={{ top: 16, bottom: 16, left: 24, right: 24 }}
+              style={styles.headerTitleButton}
+            >
               <ThemedText type="smallBold" numberOfLines={1} style={{ color: theme.text }}>
                 {list?.title ?? ''}
               </ThemedText>
+              <Ionicons name="chevron-down" size={14} color={theme.textSecondary} style={{ marginLeft: 4 }} />
             </Pressable>
           ),
           headerRight: () => (
@@ -328,6 +333,13 @@ export default function ListDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerTitleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
   scrim: {
     ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.25)',
