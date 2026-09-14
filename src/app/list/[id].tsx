@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector, Swipeable } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -37,6 +37,8 @@ const DARK_TEXT = '#1f1f1f';
 const DARK_TEXT_MUTED = '#5b5b5b';
 
 type RowLayout = { y: number; height: number };
+
+const NEST_SWIPE_WIDTH = 44;
 
 // Given a row's rank among its siblings (after removing itself), find the Y
 // position it should sit at. originalIds is the group's natural (pre-drag)
@@ -93,8 +95,8 @@ function ChecklistRow({
 }) {
   const translateY = useSharedValue(0);
   const isActive = useSharedValue(false);
+  const swipeX = useSharedValue(0);
   const itemId = item.id;
-  const swipeableRef = useRef<Swipeable>(null);
 
   const commitOrder = (orderMap: Record<string, number>) => {
     const ordered = Object.entries(orderMap)
@@ -161,10 +163,28 @@ function ChecklistRow({
 
   const checkboxGesture = Gesture.Race(tap, pan);
 
+  // Swipe-right-to-nest, attached to the whole row. It explicitly waits for
+  // the checkbox's own gesture to fail first: without that, both gestures
+  // are candidates for a touch that starts on the checkbox (exactly where a
+  // rightward swipe naturally begins), and the row-wide one could win before
+  // the checkbox's long-press-then-drag ever gets a chance to activate.
+  const swipeGesture = Gesture.Pan()
+    .activeOffsetX([20, 1000])
+    .failOffsetY([-10, 10])
+    .requireExternalGestureToFail(tap, pan)
+    .onUpdate((event) => {
+      swipeX.value = Math.max(0, Math.min(event.translationX, NEST_SWIPE_WIDTH));
+    })
+    .onEnd(() => {
+      const shouldTrigger = swipeX.value > NEST_SWIPE_WIDTH / 2;
+      swipeX.value = withTiming(0, { duration: 150 });
+      if (shouldTrigger) runOnJS(onNestAction)();
+    });
+
   const animatedStyle = useAnimatedStyle(() => {
     if (isActive.value) {
       return {
-        transform: [{ translateY: translateY.value }, { scale: withTiming(1.03) }],
+        transform: [{ translateY: translateY.value }, { translateX: swipeX.value }, { scale: withTiming(1.03) }],
         zIndex: 10,
         backgroundColor: 'rgba(120,120,128,0.12)',
         shadowColor: '#000',
@@ -181,7 +201,11 @@ function ChecklistRow({
     const targetY = targetYForRank(itemId, originalIds, layout.value, rank);
 
     return {
-      transform: [{ translateY: withTiming(targetY - myOriginalY, { duration: 150 }) }, { scale: withTiming(1) }],
+      transform: [
+        { translateY: withTiming(targetY - myOriginalY, { duration: 150 }) },
+        { translateX: swipeX.value },
+        { scale: withTiming(1) },
+      ],
       zIndex: 0,
       shadowOpacity: withTiming(0),
       elevation: 0,
@@ -189,7 +213,11 @@ function ChecklistRow({
     };
   });
 
-  const rowContent = (
+  const nestIndicatorStyle = useAnimatedStyle(() => ({
+    opacity: swipeX.value / NEST_SWIPE_WIDTH,
+  }));
+
+  const rowInner = (
     <Animated.View style={[pillStyle, styles.row, isNested && styles.nestedRow, animatedStyle]}>
       <GestureDetector gesture={checkboxGesture}>
         <Animated.View hitSlop={12}>
@@ -212,10 +240,15 @@ function ChecklistRow({
     </Animated.View>
   );
 
-  // The outer plain View (not Animated, not Swipeable) is what carries
-  // onLayout: it's a flat sibling of every other row in this group
-  // regardless of whether this particular row is wrapped in a Swipeable,
-  // so the group's Y-position math stays consistent either way.
+  const rowContent = canNest ? (
+    <GestureDetector gesture={swipeGesture}>{rowInner}</GestureDetector>
+  ) : (
+    rowInner
+  );
+
+  // The outer plain View carries onLayout: it's a flat sibling of every
+  // other row in this group, so the group's Y-position math stays
+  // consistent regardless of the extra layers the swipe gesture adds.
   const handleLayout = (e: { nativeEvent: { layout: { y: number; height: number } } }) => {
     layout.value = {
       ...layout.value,
@@ -223,30 +256,18 @@ function ChecklistRow({
     };
   };
 
-  if (!canNest) {
-    return <View onLayout={handleLayout}>{rowContent}</View>;
-  }
-
   return (
-    <View onLayout={handleLayout}>
-      <Swipeable
-        ref={swipeableRef}
-        leftThreshold={56}
-        overshootLeft={false}
-        renderLeftActions={() => (
-          <View style={styles.nestIndicator}>
-            <Ionicons
-              name={isNested ? 'return-up-back-outline' : 'arrow-forward-outline'}
-              size={14}
-              color={mutedColor}
-            />
-          </View>
-        )}
-        onSwipeableWillOpen={onNestAction}
-        onSwipeableOpen={() => swipeableRef.current?.close()}
-      >
-        {rowContent}
-      </Swipeable>
+    <View onLayout={handleLayout} style={canNest ? styles.nestSwipeContainer : undefined}>
+      {canNest && (
+        <Animated.View style={[styles.nestIndicator, nestIndicatorStyle]}>
+          <Ionicons
+            name={isNested ? 'return-up-back-outline' : 'arrow-forward-outline'}
+            size={14}
+            color={mutedColor}
+          />
+        </Animated.View>
+      )}
+      {rowContent}
     </View>
   );
 }
@@ -681,8 +702,15 @@ const styles = StyleSheet.create({
   nestedRow: {
     marginLeft: Spacing.five,
   },
+  nestSwipeContainer: {
+    position: 'relative',
+  },
   nestIndicator: {
-    width: 36,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: NEST_SWIPE_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
   },
