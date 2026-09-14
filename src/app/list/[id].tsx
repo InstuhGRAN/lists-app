@@ -22,7 +22,7 @@ import { useListItems } from '@/hooks/use-list-items';
 import { useLists } from '@/hooks/use-lists';
 import { useTheme } from '@/hooks/use-theme';
 import { getListBackgroundImageUrl, uploadListBackgroundImage } from '@/lib/list-backgrounds';
-import type { ListItemRow } from '@/types';
+import { CUSTOM_LIST_ICONS, DEFAULT_CUSTOM_ICON, type ListItemRow } from '@/types';
 
 const DARK_TEXT = '#1f1f1f';
 const DARK_TEXT_MUTED = '#5b5b5b';
@@ -85,6 +85,7 @@ export default function ListDetailScreen() {
   const [themePickerVisible, setThemePickerVisible] = useState(false);
   const [renameModalVisible, setRenameModalVisible] = useState(false);
   const [renameDraft, setRenameDraft] = useState('');
+  const [renameIcon, setRenameIcon] = useState(DEFAULT_CUSTOM_ICON);
 
   const hasImage = !!list?.background_image_path;
   const imageUrl = list?.background_image_path
@@ -104,13 +105,18 @@ export default function ListDetailScreen() {
   };
 
   const openRenameModal = () => {
-    setRenameDraft(list?.title ?? '');
+    if (!list) return;
+    setRenameDraft(list.title);
+    setRenameIcon(list.icon ?? DEFAULT_CUSTOM_ICON);
     setRenameModalVisible(true);
   };
 
   const submitRename = async () => {
     if (!list || !renameDraft.trim()) return;
     await updateListTitle(list.id, renameDraft.trim());
+    if (list.kind === 'custom' && renameIcon !== list.icon) {
+      await updateListIcon(list.id, renameIcon);
+    }
     setRenameModalVisible(false);
   };
 
@@ -128,16 +134,17 @@ export default function ListDetailScreen() {
     <>
       <Stack.Screen
         options={{
-          title: list?.title ?? '',
+          headerTitle: () => (
+            <Pressable onPress={openRenameModal} hitSlop={8}>
+              <ThemedText type="smallBold" numberOfLines={1} style={{ color: theme.text }}>
+                {list?.title ?? ''}
+              </ThemedText>
+            </Pressable>
+          ),
           headerRight: () => (
-            <View style={{ flexDirection: 'row', gap: Spacing.two }}>
-              <Pressable onPress={openRenameModal} hitSlop={8} style={{ padding: 4 }}>
-                <Ionicons name="create-outline" size={22} color={theme.text} />
-              </Pressable>
-              <Pressable onPress={() => setThemePickerVisible(true)} hitSlop={8} style={{ padding: 4 }}>
-                <Ionicons name="color-palette-outline" size={22} color={theme.text} />
-              </Pressable>
-            </View>
+            <Pressable onPress={() => setThemePickerVisible(true)} hitSlop={8} style={{ padding: 4 }}>
+              <Ionicons name="color-palette-outline" size={22} color={theme.text} />
+            </Pressable>
           ),
         }}
       />
@@ -217,11 +224,6 @@ export default function ListDetailScreen() {
           setThemePickerVisible(false);
           if (list) updateListBackground(list.id, { color: null, imagePath: null });
         }}
-        showIconPicker={list?.kind === 'custom'}
-        currentIcon={list?.icon}
-        onSelectIcon={(icon) => {
-          if (list) updateListIcon(list.id, icon);
-        }}
       />
 
       <Modal
@@ -236,7 +238,7 @@ export default function ListDetailScreen() {
         >
           <ThemedView style={styles.renameCard}>
             <ThemedText type="smallBold" style={{ marginBottom: Spacing.three }}>
-              Rename list
+              Edit list
             </ThemedText>
             <TextInput
               value={renameDraft}
@@ -248,6 +250,31 @@ export default function ListDetailScreen() {
                 { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.border },
               ]}
             />
+
+            {list?.kind === 'custom' && (
+              <View style={styles.iconRow}>
+                {CUSTOM_LIST_ICONS.map((iconName) => (
+                  <Pressable
+                    key={iconName}
+                    onPress={() => setRenameIcon(iconName)}
+                    style={[
+                      styles.iconChoice,
+                      {
+                        backgroundColor:
+                          renameIcon === iconName ? theme.accent : theme.backgroundElement,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={iconName as never}
+                      size={18}
+                      color={renameIcon === iconName ? '#fff' : theme.text}
+                    />
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
             <View style={styles.renameActions}>
               <Pressable onPress={() => setRenameModalVisible(false)} style={styles.renameButton}>
                 <ThemedText themeColor="textSecondary">Cancel</ThemedText>
@@ -340,6 +367,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.three,
     fontSize: 16,
     marginBottom: Spacing.four,
+  },
+  iconRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    marginBottom: Spacing.four,
+  },
+  iconChoice: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   renameActions: {
     flexDirection: 'row',

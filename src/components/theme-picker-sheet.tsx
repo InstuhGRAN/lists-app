@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { CUSTOM_LIST_ICONS, LIST_BACKGROUND_COLORS } from '@/types';
+import { LIST_BACKGROUND_COLORS } from '@/types';
 
 type Props = {
   visible: boolean;
@@ -16,9 +16,6 @@ type Props = {
   onSelectColor: (color: string) => void;
   onSelectImageUri: (uri: string) => void;
   onClear: () => void;
-  showIconPicker?: boolean;
-  currentIcon?: string | null;
-  onSelectIcon?: (icon: string) => void;
 };
 
 export function ThemePickerSheet({
@@ -29,9 +26,6 @@ export function ThemePickerSheet({
   onSelectColor,
   onSelectImageUri,
   onClear,
-  showIconPicker,
-  currentIcon,
-  onSelectIcon,
 }: Props) {
   const theme = useTheme();
 
@@ -61,35 +55,6 @@ export function ThemePickerSheet({
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable onPress={(e) => e.stopPropagation()}>
           <ThemedView style={styles.sheet}>
-            {showIconPicker && onSelectIcon && (
-              <>
-                <ThemedText type="smallBold" style={{ marginBottom: Spacing.three }}>
-                  Icon
-                </ThemedText>
-                <View style={styles.swatchRow}>
-                  {CUSTOM_LIST_ICONS.map((iconName) => (
-                    <Pressable
-                      key={iconName}
-                      onPress={() => onSelectIcon(iconName)}
-                      style={[
-                        styles.swatch,
-                        {
-                          backgroundColor:
-                            currentIcon === iconName ? theme.accent : theme.backgroundElement,
-                        },
-                      ]}
-                    >
-                      <Ionicons
-                        name={iconName as never}
-                        size={18}
-                        color={currentIcon === iconName ? '#fff' : theme.text}
-                      />
-                    </Pressable>
-                  ))}
-                </View>
-              </>
-            )}
-
             <ThemedText type="smallBold" style={{ marginBottom: Spacing.three }}>
               List theme
             </ThemedText>
