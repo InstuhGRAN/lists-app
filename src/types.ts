@@ -18,6 +18,7 @@ export interface ListItemRow {
   label: string;
   is_checked: boolean;
   position: number;
+  parent_item_id: string | null;
   created_at: string;
 }
 

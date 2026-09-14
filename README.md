@@ -14,6 +14,9 @@ travel checklists and grocery lists, with cloud sync across devices.
   Custom lists).
 - **Archive**: swipe a list left on the Lists screen to archive it. The archive icon in the
   header opens the Archive screen, where you can restore a list or delete it permanently.
+- **Sub-items**: swipe an item right to nest it under the item above (one level). Checking a
+  parent item checks all its sub-items too. Use the small up/down chevrons on a row to
+  reorder it among its siblings.
 
 > **Add-by-voice is temporarily removed.** It used `expo-speech-recognition`, a native module
 > not bundled in Expo Go — having it installed made Expo Go refuse to open the project at all
@@ -40,7 +43,10 @@ travel checklists and grocery lists, with cloud sync across devices.
 5. Run a fourth query with the contents of
    [`supabase/004_list_archive.sql`](./supabase/004_list_archive.sql) — this adds archive
    (soft-delete) support.
-6. Go to **Project Settings → API** and copy the **Project URL** and **anon public** key.
+6. Run a fifth query with the contents of
+   [`supabase/005_list_item_nesting.sql`](./supabase/005_list_item_nesting.sql) — this adds
+   one level of sub-item nesting.
+7. Go to **Project Settings → API** and copy the **Project URL** and **anon public** key.
 
 ## 2. Configure environment variables
 

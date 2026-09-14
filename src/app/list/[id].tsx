@@ -12,6 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -29,23 +30,37 @@ const DARK_TEXT_MUTED = '#5b5b5b';
 
 function ChecklistRow({
   item,
+  isNested,
+  canNest,
   onToggle,
   onDelete,
   onCommitLabel,
+  onNestAction,
+  onMoveUp,
+  onMoveDown,
+  canMoveUp,
+  canMoveDown,
   textColor,
   mutedColor,
   accentColor,
 }: {
   item: ListItemRow;
+  isNested: boolean;
+  canNest: boolean;
   onToggle: () => void;
   onDelete: () => void;
   onCommitLabel: (label: string) => void;
+  onNestAction: () => void;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   textColor: string;
   mutedColor: string;
   accentColor: string;
 }) {
-  return (
-    <View style={styles.row}>
+  const row = (
+    <View style={[styles.row, isNested && styles.nestedRow]}>
       <Pressable onPress={onToggle} hitSlop={8}>
         <Ionicons
           name={item.is_checked ? 'checkmark-circle' : 'ellipse-outline'}
@@ -53,6 +68,14 @@ function ChecklistRow({
           color={item.is_checked ? accentColor : mutedColor}
         />
       </Pressable>
+      <View style={styles.moveButtons}>
+        <Pressable onPress={onMoveUp} disabled={!canMoveUp} hitSlop={6}>
+          <Ionicons name="chevron-up" size={14} color={mutedColor} style={{ opacity: canMoveUp ? 1 : 0.25 }} />
+        </Pressable>
+        <Pressable onPress={onMoveDown} disabled={!canMoveDown} hitSlop={6}>
+          <Ionicons name="chevron-down" size={14} color={mutedColor} style={{ opacity: canMoveDown ? 1 : 0.25 }} />
+        </Pressable>
+      </View>
       <TextInput
         key={`${item.id}:${item.label}`}
         defaultValue={item.label}
@@ -69,13 +92,29 @@ function ChecklistRow({
       </Pressable>
     </View>
   );
+
+  if (!canNest) return row;
+
+  return (
+    <Swipeable
+      overshootLeft={false}
+      renderLeftActions={() => (
+        <Pressable onPress={onNestAction} style={styles.nestAction}>
+          <Ionicons name={isNested ? 'return-up-back-outline' : 'arrow-forward-outline'} size={18} color="#fff" />
+        </Pressable>
+      )}
+    >
+      {row}
+    </Swipeable>
+  );
 }
 
 export default function ListDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const { session } = useAuth();
-  const { items, addItem, updateLabel, toggleItem, deleteItem } = useListItems(id);
+  const { items, addItem, updateLabel, toggleItem, deleteItem, indentItem, outdentItem, moveItem } =
+    useListItems(id);
   const { lists, updateListTitle, updateListIcon, updateListBackground } = useLists();
   const list = useMemo(() => lists.find((l) => l.id === id) ?? null, [lists, id]);
 
@@ -127,7 +166,13 @@ export default function ListDetailScreen() {
     await updateListBackground(list.id, { color: null, imagePath: path });
   };
 
-  const unchecked = items.filter((item) => !item.is_checked);
+  const topLevelUnchecked = items
+    .filter((item) => !item.parent_item_id && !item.is_checked)
+    .sort((a, b) => a.position - b.position);
+  const childrenOf = (parentId: string) =>
+    items
+      .filter((item) => item.parent_item_id === parentId && !item.is_checked)
+      .sort((a, b) => a.position - b.position);
   const checked = items.filter((item) => item.is_checked);
 
   const content = (
@@ -161,19 +206,51 @@ export default function ListDetailScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
-        {unchecked.map((item) => (
-          <View key={item.id} style={rowPillStyle}>
-            <ChecklistRow
-              item={item}
-              onToggle={() => toggleItem(item.id, true)}
-              onDelete={() => deleteItem(item.id)}
-              onCommitLabel={(label) => updateLabel(item.id, label)}
-              textColor={textColor}
-              mutedColor={mutedColor}
-              accentColor={accentColor}
-            />
-          </View>
-        ))}
+        {topLevelUnchecked.map((item, index) => {
+          const children = childrenOf(item.id);
+          return (
+            <View key={item.id}>
+              <View style={rowPillStyle}>
+                <ChecklistRow
+                  item={item}
+                  isNested={false}
+                  canNest={index > 0 && children.length === 0}
+                  onToggle={() => toggleItem(item.id, true)}
+                  onDelete={() => deleteItem(item.id)}
+                  onCommitLabel={(label) => updateLabel(item.id, label)}
+                  onNestAction={() => indentItem(item.id)}
+                  onMoveUp={() => moveItem(item.id, 'up')}
+                  onMoveDown={() => moveItem(item.id, 'down')}
+                  canMoveUp={index > 0}
+                  canMoveDown={index < topLevelUnchecked.length - 1}
+                  textColor={textColor}
+                  mutedColor={mutedColor}
+                  accentColor={accentColor}
+                />
+              </View>
+              {children.map((child, childIndex) => (
+                <View key={child.id} style={rowPillStyle}>
+                  <ChecklistRow
+                    item={child}
+                    isNested
+                    canNest
+                    onToggle={() => toggleItem(child.id, true)}
+                    onDelete={() => deleteItem(child.id)}
+                    onCommitLabel={(label) => updateLabel(child.id, label)}
+                    onNestAction={() => outdentItem(child.id)}
+                    onMoveUp={() => moveItem(child.id, 'up')}
+                    onMoveDown={() => moveItem(child.id, 'down')}
+                    canMoveUp={childIndex > 0}
+                    canMoveDown={childIndex < children.length - 1}
+                    textColor={textColor}
+                    mutedColor={mutedColor}
+                    accentColor={accentColor}
+                  />
+                </View>
+              ))}
+            </View>
+          );
+        })}
 
         <View style={[styles.row, rowPillStyle]}>
           <Ionicons name="ellipse-outline" size={24} color={mutedColor} style={{ opacity: 0.6 }} />
@@ -208,9 +285,16 @@ export default function ListDetailScreen() {
                 <View key={item.id} style={rowPillStyle}>
                   <ChecklistRow
                     item={item}
+                    isNested={false}
+                    canNest={false}
                     onToggle={() => toggleItem(item.id, false)}
                     onDelete={() => deleteItem(item.id)}
                     onCommitLabel={(label) => updateLabel(item.id, label)}
+                    onNestAction={() => {}}
+                    onMoveUp={() => {}}
+                    onMoveDown={() => {}}
+                    canMoveUp={false}
+                    canMoveDown={false}
                     textColor={textColor}
                     mutedColor={mutedColor}
                     accentColor={accentColor}
@@ -351,8 +435,22 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Spacing.two,
     paddingVertical: Spacing.two,
+  },
+  nestedRow: {
+    marginLeft: Spacing.five,
+  },
+  moveButtons: {
+    justifyContent: 'center',
+  },
+  nestAction: {
+    width: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#8E8E93',
+    borderRadius: 12,
+    marginRight: Spacing.two,
   },
   rowInput: {
     flex: 1,

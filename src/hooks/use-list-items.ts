@@ -3,6 +3,12 @@ import { useCallback, useEffect, useId, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import type { ListItemRow } from '@/types';
 
+function bySiblingOrder(items: ListItemRow[], parentId: string | null) {
+  return items
+    .filter((item) => item.parent_item_id === parentId && !item.is_checked)
+    .sort((a, b) => a.position - b.position);
+}
+
 export function useListItems(listId: string) {
   const [items, setItems] = useState<ListItemRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,16 +67,19 @@ export function useListItems(listId: string) {
     [refresh],
   );
 
+  // Checking/unchecking a parent applies the same state to all of its
+  // sub-items, so a group always ends up fully checked or fully unchecked.
   const toggleItem = useCallback(
     async (id: string, isChecked: boolean) => {
+      const childIds = items.filter((item) => item.parent_item_id === id).map((item) => item.id);
       const { error } = await supabase
         .from('list_items')
         .update({ is_checked: isChecked })
-        .eq('id', id);
+        .in('id', [id, ...childIds]);
       if (!error) await refresh();
       return error;
     },
-    [refresh],
+    [items, refresh],
   );
 
   const deleteItem = useCallback(
@@ -82,5 +91,82 @@ export function useListItems(listId: string) {
     [refresh],
   );
 
-  return { items, loading, addItem, updateLabel, toggleItem, deleteItem };
+  // Swipe-right: nest this item under the one directly above it. Only one
+  // level of nesting is supported, so an item with its own sub-items can't
+  // itself be nested, and there must be a top-level item above it to nest under.
+  const indentItem = useCallback(
+    async (id: string) => {
+      const topLevel = bySiblingOrder(items, null);
+      const index = topLevel.findIndex((item) => item.id === id);
+      if (index <= 0) return;
+
+      const item = topLevel[index];
+      const hasChildren = items.some((i) => i.parent_item_id === item.id);
+      if (hasChildren) return;
+
+      const newParent = topLevel[index - 1];
+      const newParentChildren = bySiblingOrder(items, newParent.id);
+
+      const { error } = await supabase
+        .from('list_items')
+        .update({ parent_item_id: newParent.id, position: newParentChildren.length })
+        .eq('id', id);
+      if (!error) await refresh();
+      return error;
+    },
+    [items, refresh],
+  );
+
+  // Swipe-right on an already-nested item: pop it back out to top level.
+  const outdentItem = useCallback(
+    async (id: string) => {
+      const item = items.find((i) => i.id === id);
+      if (!item || !item.parent_item_id) return;
+
+      const topLevel = bySiblingOrder(items, null);
+      const { error } = await supabase
+        .from('list_items')
+        .update({ parent_item_id: null, position: topLevel.length })
+        .eq('id', id);
+      if (!error) await refresh();
+      return error;
+    },
+    [items, refresh],
+  );
+
+  // Swaps this item with its neighbor among siblings at the same nesting
+  // level (top-level items reorder among top-level items; sub-items reorder
+  // among their parent's other sub-items).
+  const moveItem = useCallback(
+    async (id: string, direction: 'up' | 'down') => {
+      const item = items.find((i) => i.id === id);
+      if (!item) return;
+
+      const siblings = bySiblingOrder(items, item.parent_item_id);
+      const index = siblings.findIndex((i) => i.id === id);
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= siblings.length) return;
+
+      const target = siblings[targetIndex];
+      const { error } = await supabase.from('list_items').upsert([
+        { id: item.id, position: target.position },
+        { id: target.id, position: item.position },
+      ]);
+      if (!error) await refresh();
+      return error;
+    },
+    [items, refresh],
+  );
+
+  return {
+    items,
+    loading,
+    addItem,
+    updateLabel,
+    toggleItem,
+    deleteItem,
+    indentItem,
+    outdentItem,
+    moveItem,
+  };
 }
