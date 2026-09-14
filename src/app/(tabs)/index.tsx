@@ -80,6 +80,7 @@ export default function ListsScreen() {
             source={{ uri: getListBackgroundImageUrl(item.background_image_path!) }}
             style={styles.cardImageBackground}
             imageStyle={styles.cardImage}
+            resizeMode="cover"
           >
             {cardInner}
           </ImageBackground>

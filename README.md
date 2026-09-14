@@ -10,6 +10,7 @@ travel checklists and grocery lists, with cloud sync across devices.
   background, synced across devices.
 - **Custom icons**: Travel and Grocery lists have fixed icons; Custom lists let you pick one
   from an icon grid, at creation or later via the palette icon.
+- **Rename anytime**: the pencil icon on a list screen lets you rename it.
 
 > **Add-by-voice is temporarily removed.** It used `expo-speech-recognition`, a native module
 > not bundled in Expo Go — having it installed made Expo Go refuse to open the project at all

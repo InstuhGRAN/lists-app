@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import {
   ImageBackground,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { ThemePickerSheet } from '@/components/theme-picker-sheet';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
@@ -74,13 +76,15 @@ export default function ListDetailScreen() {
   const theme = useTheme();
   const { session } = useAuth();
   const { items, addItem, updateLabel, toggleItem, deleteItem } = useListItems(id);
-  const { lists, updateListIcon, updateListBackground } = useLists();
+  const { lists, updateListTitle, updateListIcon, updateListBackground } = useLists();
   const list = useMemo(() => lists.find((l) => l.id === id) ?? null, [lists, id]);
 
   const [draft, setDraft] = useState('');
   const draftInputRef = useRef<TextInput>(null);
   const [showChecked, setShowChecked] = useState(true);
   const [themePickerVisible, setThemePickerVisible] = useState(false);
+  const [renameModalVisible, setRenameModalVisible] = useState(false);
+  const [renameDraft, setRenameDraft] = useState('');
 
   const hasImage = !!list?.background_image_path;
   const imageUrl = list?.background_image_path
@@ -99,6 +103,17 @@ export default function ListDetailScreen() {
     draftInputRef.current?.focus();
   };
 
+  const openRenameModal = () => {
+    setRenameDraft(list?.title ?? '');
+    setRenameModalVisible(true);
+  };
+
+  const submitRename = async () => {
+    if (!list || !renameDraft.trim()) return;
+    await updateListTitle(list.id, renameDraft.trim());
+    setRenameModalVisible(false);
+  };
+
   const handleSelectImage = async (uri: string) => {
     if (!session || !list) return;
     setThemePickerVisible(false);
@@ -115,9 +130,14 @@ export default function ListDetailScreen() {
         options={{
           title: list?.title ?? '',
           headerRight: () => (
-            <Pressable onPress={() => setThemePickerVisible(true)} hitSlop={8} style={{ padding: 4 }}>
-              <Ionicons name="color-palette-outline" size={22} color={theme.text} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: Spacing.two }}>
+              <Pressable onPress={openRenameModal} hitSlop={8} style={{ padding: 4 }}>
+                <Ionicons name="create-outline" size={22} color={theme.text} />
+              </Pressable>
+              <Pressable onPress={() => setThemePickerVisible(true)} hitSlop={8} style={{ padding: 4 }}>
+                <Ionicons name="color-palette-outline" size={22} color={theme.text} />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -203,6 +223,47 @@ export default function ListDetailScreen() {
           if (list) updateListIcon(list.id, icon);
         }}
       />
+
+      <Modal
+        visible={renameModalVisible}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setRenameModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.renameOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <ThemedView style={styles.renameCard}>
+            <ThemedText type="smallBold" style={{ marginBottom: Spacing.three }}>
+              Rename list
+            </ThemedText>
+            <TextInput
+              value={renameDraft}
+              onChangeText={setRenameDraft}
+              onSubmitEditing={submitRename}
+              autoFocus
+              style={[
+                styles.renameInput,
+                { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.border },
+              ]}
+            />
+            <View style={styles.renameActions}>
+              <Pressable onPress={() => setRenameModalVisible(false)} style={styles.renameButton}>
+                <ThemedText themeColor="textSecondary">Cancel</ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={submitRename}
+                style={[styles.renameButton, { backgroundColor: theme.accent, borderRadius: 10 }]}
+              >
+                <ThemedText style={{ color: '#fff' }} type="smallBold">
+                  Save
+                </ThemedText>
+              </Pressable>
+            </View>
+          </ThemedView>
+        </KeyboardAvoidingView>
+      </Modal>
     </>
   );
 
@@ -259,5 +320,35 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     paddingVertical: Spacing.three,
     marginTop: Spacing.two,
+  },
+  renameOverlay: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    padding: Spacing.five,
+  },
+  renameCard: {
+    width: '100%',
+    borderRadius: 16,
+    padding: Spacing.four,
+  },
+  renameInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    fontSize: 16,
+    marginBottom: Spacing.four,
+  },
+  renameActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: Spacing.three,
+  },
+  renameButton: {
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.two,
+    borderRadius: 10,
   },
 });

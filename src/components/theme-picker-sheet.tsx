@@ -42,10 +42,13 @@ export function ThemePickerSheet({
       return;
     }
 
+    // No allowsEditing: the OS crop step forces a fixed aspect ratio and, on
+    // Android especially, hands back a heavily downscaled bitmap. Use the
+    // original photo at near-full quality and let our own resizeMode="cover"
+    // handle framing instead.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      quality: 0.7,
+      quality: 0.95,
     });
 
     if (!result.canceled && result.assets[0]) {

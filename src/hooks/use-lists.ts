@@ -48,6 +48,17 @@ export function useLists() {
     [session, refresh],
   );
 
+  const updateListTitle = useCallback(
+    async (id: string, title: string) => {
+      const trimmed = title.trim();
+      if (!trimmed) return;
+      const { error } = await supabase.from('lists').update({ title: trimmed }).eq('id', id);
+      if (!error) await refresh();
+      return error;
+    },
+    [refresh],
+  );
+
   const updateListIcon = useCallback(
     async (id: string, icon: string) => {
       const { error } = await supabase.from('lists').update({ icon }).eq('id', id);
@@ -78,5 +89,14 @@ export function useLists() {
     [refresh],
   );
 
-  return { lists, loading, createList, updateListIcon, updateListBackground, deleteList, refresh };
+  return {
+    lists,
+    loading,
+    createList,
+    updateListTitle,
+    updateListIcon,
+    updateListBackground,
+    deleteList,
+    refresh,
+  };
 }
