@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, Swipeable } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedStyle,
@@ -94,6 +94,7 @@ function ChecklistRow({
   const translateY = useSharedValue(0);
   const isActive = useSharedValue(false);
   const itemId = item.id;
+  const swipeableRef = useRef<Swipeable>(null);
 
   const commitOrder = (orderMap: Record<string, number>) => {
     const ordered = Object.entries(orderMap)
@@ -113,13 +114,26 @@ function ChecklistRow({
       if (!myLayout) return;
 
       const currentCenter = myLayout.y + myLayout.height / 2 + event.translationY;
+      const currentRank = positions.value[itemId] ?? index;
+
       let targetIndex = 0;
       for (const otherId of originalIds) {
         if (otherId === itemId) continue;
         const otherLayout = layout.value[otherId];
         if (!otherLayout) continue;
-        if (otherLayout.y + otherLayout.height / 2 < currentCenter) targetIndex++;
+        const otherCenter = otherLayout.y + otherLayout.height / 2;
+        // Small hysteresis margin so a boundary sitting exactly at the
+        // finger's position doesn't flicker rank back and forth.
+        const bias = otherCenter < currentCenter ? -4 : 4;
+        if (otherCenter + bias < currentCenter) targetIndex++;
       }
+
+      // Skip the reassignment entirely when nothing actually changed --
+      // writing an equal-but-new object to a shared value still triggers
+      // every row's animated style to recompute, which was restarting
+      // their slide animation on every pan frame and looked like other
+      // rows randomly jumping.
+      if (targetIndex === currentRank) return;
 
       const newOrder = originalIds.filter((x) => x !== itemId);
       newOrder.splice(targetIndex, 0, itemId);
@@ -175,16 +189,8 @@ function ChecklistRow({
     };
   });
 
-  return (
-    <Animated.View
-      style={[pillStyle, styles.row, isNested && styles.nestedRow, animatedStyle]}
-      onLayout={(e) => {
-        layout.value = {
-          ...layout.value,
-          [itemId]: { y: e.nativeEvent.layout.y, height: e.nativeEvent.layout.height },
-        };
-      }}
-    >
+  const rowContent = (
+    <Animated.View style={[pillStyle, styles.row, isNested && styles.nestedRow, animatedStyle]}>
       <GestureDetector gesture={checkboxGesture}>
         <Animated.View hitSlop={12}>
           <Ionicons
@@ -200,19 +206,48 @@ function ChecklistRow({
         onEndEditing={(e) => onCommitLabel(e.nativeEvent.text)}
         style={[styles.rowInput, { color: textColor }]}
       />
-      {canNest && (
-        <Pressable onPress={onNestAction} hitSlop={8}>
-          <Ionicons
-            name={isNested ? 'return-up-back-outline' : 'arrow-forward-outline'}
-            size={16}
-            color={mutedColor}
-          />
-        </Pressable>
-      )}
       <Pressable onPress={onDelete} hitSlop={8}>
         <Ionicons name="close" size={20} color={mutedColor} />
       </Pressable>
     </Animated.View>
+  );
+
+  // The outer plain View (not Animated, not Swipeable) is what carries
+  // onLayout: it's a flat sibling of every other row in this group
+  // regardless of whether this particular row is wrapped in a Swipeable,
+  // so the group's Y-position math stays consistent either way.
+  const handleLayout = (e: { nativeEvent: { layout: { y: number; height: number } } }) => {
+    layout.value = {
+      ...layout.value,
+      [itemId]: { y: e.nativeEvent.layout.y, height: e.nativeEvent.layout.height },
+    };
+  };
+
+  if (!canNest) {
+    return <View onLayout={handleLayout}>{rowContent}</View>;
+  }
+
+  return (
+    <View onLayout={handleLayout}>
+      <Swipeable
+        ref={swipeableRef}
+        leftThreshold={56}
+        overshootLeft={false}
+        renderLeftActions={() => (
+          <View style={styles.nestIndicator}>
+            <Ionicons
+              name={isNested ? 'return-up-back-outline' : 'arrow-forward-outline'}
+              size={14}
+              color={mutedColor}
+            />
+          </View>
+        )}
+        onSwipeableWillOpen={onNestAction}
+        onSwipeableOpen={() => swipeableRef.current?.close()}
+      >
+        {rowContent}
+      </Swipeable>
+    </View>
   );
 }
 
@@ -645,6 +680,11 @@ const styles = StyleSheet.create({
   },
   nestedRow: {
     marginLeft: Spacing.five,
+  },
+  nestIndicator: {
+    width: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowInput: {
     flex: 1,

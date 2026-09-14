@@ -14,9 +14,9 @@ travel checklists and grocery lists, with cloud sync across devices.
   Custom lists).
 - **Archive**: swipe a list left on the Lists screen to archive it. The archive icon in the
   header opens the Archive screen, where you can restore a list or delete it permanently.
-- **Sub-items**: tap the small arrow icon on an item to nest it under the item above (one
-  level); tap it again on a nested item to pop it back out. Checking a parent item checks all
-  its sub-items too.
+- **Sub-items**: swipe an item right to nest it under the item above (one level); swipe an
+  already-nested item right to pop it back out. Checking a parent item checks all its
+  sub-items too.
 - **Reorder**: press and hold an item's checkbox, then drag to move it — modeled on iOS
   Reminders. Release to drop it in its new spot. Reordering stays within the same group (top-
   level items reorder among top-level items; sub-items reorder among their parent's other
