@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
 import type { ListItemRow } from '@/types';
@@ -6,6 +6,7 @@ import type { ListItemRow } from '@/types';
 export function useListItems(listId: string) {
   const [items, setItems] = useState<ListItemRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const instanceId = useId();
 
   const refresh = useCallback(async () => {
     const { data, error } = await supabase
@@ -21,7 +22,7 @@ export function useListItems(listId: string) {
     refresh();
 
     const channel = supabase
-      .channel(`list-items-${listId}`)
+      .channel(`list-items-${listId}-${instanceId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'list_items', filter: `list_id=eq.${listId}` },
@@ -34,7 +35,7 @@ export function useListItems(listId: string) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [listId, refresh]);
+  }, [listId, refresh, instanceId]);
 
   const addItem = useCallback(
     async (label: string) => {

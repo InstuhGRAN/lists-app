@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useState } from 'react';
 
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
@@ -8,6 +8,7 @@ export function useLists() {
   const { session } = useAuth();
   const [lists, setLists] = useState<ListRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const instanceId = useId();
 
   const refresh = useCallback(async () => {
     if (!session) return;
@@ -24,7 +25,7 @@ export function useLists() {
 
     if (!session) return;
     const channel = supabase
-      .channel('lists-changes')
+      .channel(`lists-changes-${instanceId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lists' }, () => {
         refresh();
       })
@@ -33,7 +34,7 @@ export function useLists() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [session, refresh]);
+  }, [session, refresh, instanceId]);
 
   const createList = useCallback(
     async (title: string, kind: ListKind) => {
