@@ -49,6 +49,17 @@ export function useListItems(listId: string) {
     [listId, items.length, refresh],
   );
 
+  const updateLabel = useCallback(
+    async (id: string, label: string) => {
+      const trimmed = label.trim();
+      if (!trimmed) return;
+      const { error } = await supabase.from('list_items').update({ label: trimmed }).eq('id', id);
+      if (!error) await refresh();
+      return error;
+    },
+    [refresh],
+  );
+
   const toggleItem = useCallback(
     async (id: string, isChecked: boolean) => {
       const { error } = await supabase
@@ -70,5 +81,5 @@ export function useListItems(listId: string) {
     [refresh],
   );
 
-  return { items, loading, addItem, toggleItem, deleteItem };
+  return { items, loading, addItem, updateLabel, toggleItem, deleteItem };
 }
