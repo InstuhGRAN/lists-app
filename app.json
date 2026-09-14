@@ -33,14 +33,6 @@
           "imageWidth": 76
         }
       ],
-      [
-        "expo-speech-recognition",
-        {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone to add items by voice.",
-          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to use speech recognition to add items by voice.",
-          "androidSpeechServicePackages": ["com.google.android.googlequicksearchbox"]
-        }
-      ],
       "expo-secure-store",
       [
         "expo-image-picker",

@@ -14,7 +14,6 @@ import {
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemePickerSheet } from '@/components/theme-picker-sheet';
-import { VoiceInputButton } from '@/components/voice-input-button';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
 import { useListItems } from '@/hooks/use-list-items';
@@ -184,10 +183,6 @@ export default function ListDetailScreen() {
         )}
       </ScrollView>
 
-      <View style={styles.fabRow}>
-        <VoiceInputButton onResult={(transcript) => addItem(transcript)} />
-      </View>
-
       <ThemePickerSheet
         visible={themePickerVisible}
         onClose={() => setThemePickerVisible(false)}
@@ -259,10 +254,5 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     paddingVertical: Spacing.three,
     marginTop: Spacing.two,
-  },
-  fabRow: {
-    position: 'absolute',
-    right: Spacing.four,
-    bottom: Spacing.four,
   },
 });

@@ -1,15 +1,22 @@
 # Lists
 
 A cross-platform (iOS + Android) checklist app built with Expo / React Native. Built for
-travel checklists and grocery lists, with cloud sync across devices and add-by-voice.
+travel checklists and grocery lists, with cloud sync across devices.
 
 - **Cross-platform**: one codebase, runs on iOS, Android, and web (via Expo).
 - **Cloud sync**: lists and items are stored in Supabase (Postgres) and sync in real time
   across every device you're signed into.
-- **Add by voice**: tap the mic on a list to speak an item instead of typing it, using the
-  device's built-in speech recognition (no API key, works offline on most devices).
 - **Themes**: tap the palette icon on a list to give it a Keep-style pastel color or a photo
   background, synced across devices.
+
+> **Add-by-voice is temporarily removed.** It used `expo-speech-recognition`, a native module
+> not bundled in Expo Go — having it installed made Expo Go refuse to open the project at all
+> (it prompts to sign in and create a development build instead). It's been pulled out so the
+> app runs in plain Expo Go for now. To bring it back: restore `src/components/voice-input-button.tsx`
+> from git history (`git log --all --full-name -- '*voice-input-button*'`), re-add the
+> `expo-speech-recognition` plugin block to `app.json`, run `npm install expo-speech-recognition`,
+> and build a custom dev client (`npx expo run:ios` / `run:android`, or `eas build --profile development`)
+> instead of using plain Expo Go.
 
 ## 1. Create a Supabase project
 
@@ -48,11 +55,6 @@ npx expo start
 Then press `i` for the iOS simulator, `a` for an Android emulator, or scan the QR code with
 [Expo Go](https://expo.dev/go) on your phone.
 
-> Voice input requires a native build (a real device or simulator/emulator with the
-> `expo-speech-recognition` native module) — it does not work in Expo Go on Android, and has
-> limited support in Expo Go on iOS. For full testing, use `npx expo run:ios` /
-> `npx expo run:android`, or an EAS development build.
-
 ## Project structure
 
 ```
@@ -61,8 +63,8 @@ src/
     _layout.tsx        root layout, auth gate
     sign-in.tsx         sign in / sign up screen
     (tabs)/            main app tabs (Lists, Settings)
-    list/[id].tsx        list detail: items, checkboxes, voice + text add
-  components/          shared UI (themed text/view, voice input button)
+    list/[id].tsx        list detail: items, checkboxes, text add
+  components/          shared UI (themed text/view, theme picker sheet)
   hooks/               use-auth, use-lists, use-list-items (Supabase queries + realtime)
   lib/supabase.ts      Supabase client
   types.ts             shared TypeScript types
