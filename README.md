@@ -8,6 +8,8 @@ travel checklists and grocery lists, with cloud sync across devices and add-by-v
   across every device you're signed into.
 - **Add by voice**: tap the mic on a list to speak an item instead of typing it, using the
   device's built-in speech recognition (no API key, works offline on most devices).
+- **Themes**: tap the palette icon on a list to give it a Keep-style pastel color or a photo
+  background, synced across devices.
 
 ## 1. Create a Supabase project
 
@@ -16,7 +18,10 @@ travel checklists and grocery lists, with cloud sync across devices and add-by-v
    [`supabase/schema.sql`](./supabase/schema.sql), and run it. This creates the `lists` and
    `list_items` tables, row-level security policies (so each user only sees their own data),
    and enables realtime sync.
-3. Go to **Project Settings → API** and copy the **Project URL** and **anon public** key.
+3. Run a second query with the contents of
+   [`supabase/002_list_themes.sql`](./supabase/002_list_themes.sql) — this adds the list
+   background color/photo columns and a storage bucket for background photos.
+4. Go to **Project Settings → API** and copy the **Project URL** and **anon public** key.
 
 ## 2. Configure environment variables
 

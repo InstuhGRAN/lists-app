@@ -47,6 +47,18 @@ export function useLists() {
     [session, refresh],
   );
 
+  const updateListBackground = useCallback(
+    async (id: string, background: { color: string | null; imagePath: string | null }) => {
+      const { error } = await supabase
+        .from('lists')
+        .update({ background_color: background.color, background_image_path: background.imagePath })
+        .eq('id', id);
+      if (!error) await refresh();
+      return error;
+    },
+    [refresh],
+  );
+
   const deleteList = useCallback(
     async (id: string) => {
       const { error } = await supabase.from('lists').delete().eq('id', id);
@@ -56,5 +68,5 @@ export function useLists() {
     [refresh],
   );
 
-  return { lists, loading, createList, deleteList, refresh };
+  return { lists, loading, createList, updateListBackground, deleteList, refresh };
 }

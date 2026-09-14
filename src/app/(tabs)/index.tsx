@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   FlatList,
+  ImageBackground,
   Modal,
   Pressable,
   StyleSheet,
@@ -16,7 +17,11 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useLists } from '@/hooks/use-lists';
 import { useTheme } from '@/hooks/use-theme';
+import { getListBackgroundImageUrl } from '@/lib/list-backgrounds';
 import { LIST_KINDS, type ListKind, type ListRow } from '@/types';
+
+const DARK_TEXT = '#1f1f1f';
+const DARK_TEXT_MUTED = '#5b5b5b';
 
 export default function ListsScreen() {
   const theme = useTheme();
@@ -36,22 +41,46 @@ export default function ListsScreen() {
 
   const renderItem = ({ item }: { item: ListRow }) => {
     const meta = LIST_KINDS.find((k) => k.value === item.kind) ?? LIST_KINDS[2];
-    return (
-      <Pressable
-        onPress={() => router.push(`/list/${item.id}`)}
-        onLongPress={() => deleteList(item.id)}
-        style={[styles.card, { backgroundColor: theme.backgroundElement }]}
-      >
-        <View style={[styles.iconCircle, { backgroundColor: theme.accent }]}>
-          <Ionicons name={meta.icon as never} size={20} color="#fff" />
+    const hasImage = !!item.background_image_path;
+    const textColor = hasImage ? '#fff' : item.background_color ? DARK_TEXT : theme.text;
+    const mutedColor = hasImage
+      ? 'rgba(255,255,255,0.8)'
+      : item.background_color
+        ? DARK_TEXT_MUTED
+        : theme.textSecondary;
+    const iconBg = hasImage || item.background_color ? 'rgba(0,0,0,0.25)' : theme.accent;
+
+    const cardInner = (
+      <View style={[styles.card, !hasImage && { backgroundColor: item.background_color ?? theme.backgroundElement }]}>
+        {hasImage && <View style={styles.cardScrim} />}
+        <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
+          <Ionicons name={meta.icon as never} size={20} color={hasImage ? '#fff' : item.background_color ? DARK_TEXT : '#fff'} />
         </View>
         <View style={{ flex: 1 }}>
-          <ThemedText type="smallBold">{item.title}</ThemedText>
-          <ThemedText themeColor="textSecondary" type="small">
+          <ThemedText type="smallBold" style={{ color: textColor }}>
+            {item.title}
+          </ThemedText>
+          <ThemedText type="small" style={{ color: mutedColor }}>
             {meta.label}
           </ThemedText>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+        <Ionicons name="chevron-forward" size={20} color={mutedColor} />
+      </View>
+    );
+
+    return (
+      <Pressable onPress={() => router.push(`/list/${item.id}`)} onLongPress={() => deleteList(item.id)}>
+        {hasImage ? (
+          <ImageBackground
+            source={{ uri: getListBackgroundImageUrl(item.background_image_path!) }}
+            style={styles.cardImageBackground}
+            imageStyle={styles.cardImage}
+          >
+            {cardInner}
+          </ImageBackground>
+        ) : (
+          cardInner
+        )}
       </Pressable>
     );
   };
@@ -179,6 +208,17 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: 16,
     gap: Spacing.three,
+  },
+  cardImageBackground: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  cardImage: {
+    borderRadius: 16,
+  },
+  cardScrim: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.3)',
   },
   iconCircle: {
     width: 36,
