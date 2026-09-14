@@ -20,7 +20,7 @@ import { Spacing } from '@/constants/theme';
 import { useLists } from '@/hooks/use-lists';
 import { useTheme } from '@/hooks/use-theme';
 import { getListBackgroundImageUrl } from '@/lib/list-backgrounds';
-import { LIST_KINDS, type ListKind, type ListRow } from '@/types';
+import { CUSTOM_LIST_ICONS, DEFAULT_CUSTOM_ICON, LIST_KINDS, type ListKind, type ListRow } from '@/types';
 
 const DARK_TEXT = '#1f1f1f';
 const DARK_TEXT_MUTED = '#5b5b5b';
@@ -32,17 +32,20 @@ export default function ListsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
   const [kind, setKind] = useState<ListKind>('travel');
+  const [customIcon, setCustomIcon] = useState(DEFAULT_CUSTOM_ICON);
 
   const handleCreate = async () => {
     if (!title.trim()) return;
-    await createList(title.trim(), kind);
+    await createList(title.trim(), kind, kind === 'custom' ? customIcon : null);
     setTitle('');
     setKind('travel');
+    setCustomIcon(DEFAULT_CUSTOM_ICON);
     setModalVisible(false);
   };
 
   const renderItem = ({ item }: { item: ListRow }) => {
     const meta = LIST_KINDS.find((k) => k.value === item.kind) ?? LIST_KINDS[2];
+    const iconName = item.kind === 'custom' && item.icon ? item.icon : meta.icon;
     const hasImage = !!item.background_image_path;
     const textColor = hasImage ? '#fff' : item.background_color ? DARK_TEXT : theme.text;
     const mutedColor = hasImage
@@ -56,7 +59,7 @@ export default function ListsScreen() {
       <View style={[styles.card, !hasImage && { backgroundColor: item.background_color ?? theme.backgroundElement }]}>
         {hasImage && <View style={styles.cardScrim} />}
         <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
-          <Ionicons name={meta.icon as never} size={20} color={hasImage ? '#fff' : item.background_color ? DARK_TEXT : '#fff'} />
+          <Ionicons name={iconName as never} size={20} color={hasImage ? '#fff' : item.background_color ? DARK_TEXT : '#fff'} />
         </View>
         <View style={{ flex: 1 }}>
           <ThemedText type="smallBold" style={{ color: textColor }}>
@@ -165,6 +168,30 @@ export default function ListsScreen() {
               ))}
             </View>
 
+            {kind === 'custom' && (
+              <View style={styles.iconRow}>
+                {CUSTOM_LIST_ICONS.map((iconName) => (
+                  <Pressable
+                    key={iconName}
+                    onPress={() => setCustomIcon(iconName)}
+                    style={[
+                      styles.iconChoice,
+                      {
+                        backgroundColor:
+                          customIcon === iconName ? theme.accent : theme.backgroundElement,
+                      },
+                    ]}
+                  >
+                    <Ionicons
+                      name={iconName as never}
+                      size={18}
+                      color={customIcon === iconName ? '#fff' : theme.text}
+                    />
+                  </Pressable>
+                ))}
+              </View>
+            )}
+
             <View style={styles.modalActions}>
               <Pressable onPress={() => setModalVisible(false)} style={styles.modalButton}>
                 <ThemedText themeColor="textSecondary">Cancel</ThemedText>
@@ -269,6 +296,19 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.two,
     borderRadius: 20,
     borderWidth: 1,
+  },
+  iconRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    marginBottom: Spacing.four,
+  },
+  iconChoice: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalActions: {
     flexDirection: 'row',

@@ -37,15 +37,24 @@ export function useLists() {
   }, [session, refresh, instanceId]);
 
   const createList = useCallback(
-    async (title: string, kind: ListKind) => {
+    async (title: string, kind: ListKind, icon?: string | null) => {
       if (!session) return;
       const { error } = await supabase
         .from('lists')
-        .insert({ title, kind, user_id: session.user.id });
+        .insert({ title, kind, icon: icon ?? null, user_id: session.user.id });
       if (!error) await refresh();
       return error;
     },
     [session, refresh],
+  );
+
+  const updateListIcon = useCallback(
+    async (id: string, icon: string) => {
+      const { error } = await supabase.from('lists').update({ icon }).eq('id', id);
+      if (!error) await refresh();
+      return error;
+    },
+    [refresh],
   );
 
   const updateListBackground = useCallback(
@@ -69,5 +78,5 @@ export function useLists() {
     [refresh],
   );
 
-  return { lists, loading, createList, updateListBackground, deleteList, refresh };
+  return { lists, loading, createList, updateListIcon, updateListBackground, deleteList, refresh };
 }

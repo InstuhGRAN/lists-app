@@ -74,7 +74,7 @@ export default function ListDetailScreen() {
   const theme = useTheme();
   const { session } = useAuth();
   const { items, addItem, updateLabel, toggleItem, deleteItem } = useListItems(id);
-  const { lists, updateListBackground } = useLists();
+  const { lists, updateListIcon, updateListBackground } = useLists();
   const list = useMemo(() => lists.find((l) => l.id === id) ?? null, [lists, id]);
 
   const [draft, setDraft] = useState('');
@@ -196,6 +196,11 @@ export default function ListDetailScreen() {
         onClear={() => {
           setThemePickerVisible(false);
           if (list) updateListBackground(list.id, { color: null, imagePath: null });
+        }}
+        showIconPicker={list?.kind === 'custom'}
+        currentIcon={list?.icon}
+        onSelectIcon={(icon) => {
+          if (list) updateListIcon(list.id, icon);
         }}
       />
     </>

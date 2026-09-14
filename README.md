@@ -8,6 +8,8 @@ travel checklists and grocery lists, with cloud sync across devices.
   across every device you're signed into.
 - **Themes**: tap the palette icon on a list to give it a Keep-style pastel color or a photo
   background, synced across devices.
+- **Custom icons**: Travel and Grocery lists have fixed icons; Custom lists let you pick one
+  from an icon grid, at creation or later via the palette icon.
 
 > **Add-by-voice is temporarily removed.** It used `expo-speech-recognition`, a native module
 > not bundled in Expo Go — having it installed made Expo Go refuse to open the project at all
@@ -28,7 +30,10 @@ travel checklists and grocery lists, with cloud sync across devices.
 3. Run a second query with the contents of
    [`supabase/002_list_themes.sql`](./supabase/002_list_themes.sql) — this adds the list
    background color/photo columns and a storage bucket for background photos.
-4. Go to **Project Settings → API** and copy the **Project URL** and **anon public** key.
+4. Run a third query with the contents of
+   [`supabase/003_list_icons.sql`](./supabase/003_list_icons.sql) — this adds the custom icon
+   column for Custom lists.
+5. Go to **Project Settings → API** and copy the **Project URL** and **anon public** key.
 
 ## 2. Configure environment variables
 
