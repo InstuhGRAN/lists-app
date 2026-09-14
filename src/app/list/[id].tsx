@@ -134,6 +134,12 @@ export default function ListDetailScreen() {
     <>
       <Stack.Screen
         options={{
+          // title is still needed alongside headerTitle: react-native-screens
+          // sizes the native header's title container from this string, and
+          // without it a custom headerTitle can get measured at zero width
+          // until a navigation transition forces a relayout.
+          title: list?.title ?? '',
+          headerTitleAlign: 'center',
           headerTitle: () => (
             <Pressable onPress={openRenameModal} hitSlop={8}>
               <ThemedText type="smallBold" numberOfLines={1} style={{ color: theme.text }}>

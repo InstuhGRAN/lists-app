@@ -13,9 +13,9 @@ function RootNavigator() {
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, headerBackButtonDisplayMode: 'minimal' }}>
       <Stack.Protected guard={!!session}>
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(tabs)" options={{ title: 'Lists' }} />
         <Stack.Screen
           name="list/[id]"
           options={{ headerShown: true, presentation: 'card', title: '' }}
