@@ -134,28 +134,16 @@ export function useListItems(listId: string) {
     [items, refresh],
   );
 
-  // Swaps this item with its neighbor among siblings at the same nesting
-  // level (top-level items reorder among top-level items; sub-items reorder
-  // among their parent's other sub-items).
-  const moveItem = useCallback(
-    async (id: string, direction: 'up' | 'down') => {
-      const item = items.find((i) => i.id === id);
-      if (!item) return;
-
-      const siblings = bySiblingOrder(items, item.parent_item_id);
-      const index = siblings.findIndex((i) => i.id === id);
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= siblings.length) return;
-
-      const target = siblings[targetIndex];
-      const { error } = await supabase.from('list_items').upsert([
-        { id: item.id, position: target.position },
-        { id: target.id, position: item.position },
-      ]);
+  // Persists a full new order for one sibling group (top-level items, or one
+  // parent's sub-items) after a drag-to-reorder gesture settles.
+  const reorderSiblings = useCallback(
+    async (orderedIds: string[]) => {
+      const updates = orderedIds.map((itemId, index) => ({ id: itemId, position: index }));
+      const { error } = await supabase.from('list_items').upsert(updates);
       if (!error) await refresh();
       return error;
     },
-    [items, refresh],
+    [refresh],
   );
 
   return {
@@ -167,6 +155,6 @@ export function useListItems(listId: string) {
     deleteItem,
     indentItem,
     outdentItem,
-    moveItem,
+    reorderSiblings,
   };
 }

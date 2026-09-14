@@ -14,9 +14,13 @@ travel checklists and grocery lists, with cloud sync across devices.
   Custom lists).
 - **Archive**: swipe a list left on the Lists screen to archive it. The archive icon in the
   header opens the Archive screen, where you can restore a list or delete it permanently.
-- **Sub-items**: swipe an item right to nest it under the item above (one level). Checking a
-  parent item checks all its sub-items too. Use the small up/down chevrons on a row to
-  reorder it among its siblings.
+- **Sub-items**: tap the small arrow icon on an item to nest it under the item above (one
+  level); tap it again on a nested item to pop it back out. Checking a parent item checks all
+  its sub-items too.
+- **Reorder**: press and hold an item's checkbox, then drag to move it — modeled on iOS
+  Reminders. Release to drop it in its new spot. Reordering stays within the same group (top-
+  level items reorder among top-level items; sub-items reorder among their parent's other
+  sub-items).
 
 > **Add-by-voice is temporarily removed.** It used `expo-speech-recognition`, a native module
 > not bundled in Expo Go — having it installed made Expo Go refuse to open the project at all

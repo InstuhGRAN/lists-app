@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { Fragment, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ImageBackground,
   KeyboardAvoidingView,
@@ -12,7 +12,15 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, {
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -28,39 +36,211 @@ import { CUSTOM_LIST_ICONS, DEFAULT_CUSTOM_ICON, type ListItemRow } from '@/type
 const DARK_TEXT = '#1f1f1f';
 const DARK_TEXT_MUTED = '#5b5b5b';
 
+type RowLayout = { y: number; height: number };
+
+// Given a row's rank among its siblings (after removing itself), find the Y
+// position it should sit at, using each sibling's ORIGINAL (pre-drag)
+// measured layout. Works with variable row heights.
+function targetYForRank(
+  itemId: string,
+  originalIds: string[],
+  layout: Record<string, RowLayout>,
+  rank: number,
+) {
+  'worklet';
+  const others: RowLayout[] = [];
+  for (const otherId of originalIds) {
+    if (otherId === itemId) continue;
+    const l = layout[otherId];
+    if (l) others.push(l);
+  }
+  if (others.length === 0) return layout[itemId]?.y ?? 0;
+  if (rank < others.length) return others[rank].y;
+  const last = others[others.length - 1];
+  return last.y + last.height;
+}
+
 function ChecklistRow({
   item,
+  index,
+  originalIds,
+  positions,
+  layout,
   isNested,
   canNest,
+  pillStyle,
   onToggle,
   onDelete,
   onCommitLabel,
   onNestAction,
-  onMoveUp,
-  onMoveDown,
-  canMoveUp,
-  canMoveDown,
+  onReorderCommit,
   textColor,
   mutedColor,
   accentColor,
 }: {
   item: ListItemRow;
+  index: number;
+  originalIds: string[];
+  positions: SharedValue<Record<string, number>>;
+  layout: SharedValue<Record<string, RowLayout>>;
   isNested: boolean;
   canNest: boolean;
+  pillStyle: object | null;
   onToggle: () => void;
   onDelete: () => void;
   onCommitLabel: (label: string) => void;
   onNestAction: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  canMoveUp: boolean;
-  canMoveDown: boolean;
+  onReorderCommit: (orderedIds: string[]) => void;
   textColor: string;
   mutedColor: string;
   accentColor: string;
 }) {
-  const row = (
-    <View style={[styles.row, isNested && styles.nestedRow]}>
+  const translateY = useSharedValue(0);
+  const isActive = useSharedValue(false);
+  const itemId = item.id;
+
+  const commitOrder = (orderMap: Record<string, number>) => {
+    const ordered = Object.entries(orderMap)
+      .sort((a, b) => a[1] - b[1])
+      .map(([entryId]) => entryId);
+    onReorderCommit(ordered);
+  };
+
+  const pan = Gesture.Pan()
+    .activateAfterLongPress(350)
+    .onStart(() => {
+      isActive.value = true;
+    })
+    .onUpdate((event) => {
+      translateY.value = event.translationY;
+      const myLayout = layout.value[itemId];
+      if (!myLayout) return;
+
+      const currentCenter = myLayout.y + myLayout.height / 2 + event.translationY;
+      let targetIndex = 0;
+      for (const otherId of originalIds) {
+        if (otherId === itemId) continue;
+        const otherLayout = layout.value[otherId];
+        if (!otherLayout) continue;
+        if (otherLayout.y + otherLayout.height / 2 < currentCenter) targetIndex++;
+      }
+
+      const newOrder = originalIds.filter((x) => x !== itemId);
+      newOrder.splice(targetIndex, 0, itemId);
+      const next: Record<string, number> = {};
+      newOrder.forEach((orderedId, i) => {
+        next[orderedId] = i;
+      });
+      positions.value = next;
+    })
+    .onEnd(() => {
+      const order = positions.value;
+      const rank = order[itemId] ?? index;
+      const myLayout = layout.value[itemId];
+      const myOriginalY = myLayout?.y ?? 0;
+      const targetY = targetYForRank(itemId, originalIds, layout.value, rank);
+      translateY.value = withSpring(targetY - myOriginalY, { damping: 20 }, (finished) => {
+        if (finished) isActive.value = false;
+      });
+      runOnJS(commitOrder)(order);
+    });
+
+  const tap = Gesture.Tap().onEnd(() => {
+    runOnJS(onToggle)();
+  });
+
+  const checkboxGesture = Gesture.Race(tap, pan);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    if (isActive.value) {
+      return {
+        transform: [{ translateY: translateY.value }, { scale: withTiming(1.03) }],
+        zIndex: 10,
+        backgroundColor: 'rgba(120,120,128,0.12)',
+        shadowColor: '#000',
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 2 },
+        elevation: 6,
+        borderRadius: 12,
+      };
+    }
+
+    const rank = positions.value[itemId] ?? index;
+    const myOriginalY = layout.value[itemId]?.y ?? 0;
+    const targetY = targetYForRank(itemId, originalIds, layout.value, rank);
+
+    return {
+      transform: [{ translateY: withTiming(targetY - myOriginalY, { duration: 150 }) }, { scale: withTiming(1) }],
+      zIndex: 0,
+      shadowOpacity: withTiming(0),
+      elevation: 0,
+      borderRadius: 12,
+    };
+  });
+
+  return (
+    <Animated.View
+      style={[pillStyle, styles.row, isNested && styles.nestedRow, animatedStyle]}
+      onLayout={(e) => {
+        layout.value = {
+          ...layout.value,
+          [itemId]: { y: e.nativeEvent.layout.y, height: e.nativeEvent.layout.height },
+        };
+      }}
+    >
+      <GestureDetector gesture={checkboxGesture}>
+        <Animated.View hitSlop={12}>
+          <Ionicons
+            name={item.is_checked ? 'checkmark-circle' : 'ellipse-outline'}
+            size={24}
+            color={item.is_checked ? accentColor : mutedColor}
+          />
+        </Animated.View>
+      </GestureDetector>
+      <TextInput
+        key={`${item.id}:${item.label}`}
+        defaultValue={item.label}
+        onEndEditing={(e) => onCommitLabel(e.nativeEvent.text)}
+        style={[styles.rowInput, { color: textColor }]}
+      />
+      {canNest && (
+        <Pressable onPress={onNestAction} hitSlop={8}>
+          <Ionicons
+            name={isNested ? 'return-up-back-outline' : 'arrow-forward-outline'}
+            size={16}
+            color={mutedColor}
+          />
+        </Pressable>
+      )}
+      <Pressable onPress={onDelete} hitSlop={8}>
+        <Ionicons name="close" size={20} color={mutedColor} />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function StaticChecklistRow({
+  item,
+  pillStyle,
+  onToggle,
+  onDelete,
+  onCommitLabel,
+  textColor,
+  mutedColor,
+  accentColor,
+}: {
+  item: ListItemRow;
+  pillStyle: object | null;
+  onToggle: () => void;
+  onDelete: () => void;
+  onCommitLabel: (label: string) => void;
+  textColor: string;
+  mutedColor: string;
+  accentColor: string;
+}) {
+  return (
+    <View style={[pillStyle, styles.row]}>
       <Pressable onPress={onToggle} hitSlop={8}>
         <Ionicons
           name={item.is_checked ? 'checkmark-circle' : 'ellipse-outline'}
@@ -68,44 +248,88 @@ function ChecklistRow({
           color={item.is_checked ? accentColor : mutedColor}
         />
       </Pressable>
-      <View style={styles.moveButtons}>
-        <Pressable onPress={onMoveUp} disabled={!canMoveUp} hitSlop={6}>
-          <Ionicons name="chevron-up" size={14} color={mutedColor} style={{ opacity: canMoveUp ? 1 : 0.25 }} />
-        </Pressable>
-        <Pressable onPress={onMoveDown} disabled={!canMoveDown} hitSlop={6}>
-          <Ionicons name="chevron-down" size={14} color={mutedColor} style={{ opacity: canMoveDown ? 1 : 0.25 }} />
-        </Pressable>
-      </View>
       <TextInput
         key={`${item.id}:${item.label}`}
         defaultValue={item.label}
         onEndEditing={(e) => onCommitLabel(e.nativeEvent.text)}
-        style={[
-          styles.rowInput,
-          { color: textColor },
-          item.is_checked && { textDecorationLine: 'line-through', color: mutedColor },
-        ]}
-        multiline
+        style={[styles.rowInput, { color: textColor, textDecorationLine: 'line-through' }]}
       />
       <Pressable onPress={onDelete} hitSlop={8}>
         <Ionicons name="close" size={20} color={mutedColor} />
       </Pressable>
     </View>
   );
+}
 
-  if (!canNest) return row;
+function ChecklistGroup({
+  items,
+  isNested,
+  pillStyle,
+  computeCanNest,
+  onToggle,
+  onDelete,
+  onCommitLabel,
+  onNestAction,
+  onReorder,
+  textColor,
+  mutedColor,
+  accentColor,
+  renderAfterItem,
+}: {
+  items: ListItemRow[];
+  isNested: boolean;
+  pillStyle: object | null;
+  computeCanNest: (item: ListItemRow, index: number) => boolean;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onCommitLabel: (id: string, label: string) => void;
+  onNestAction: (id: string) => void;
+  onReorder: (orderedIds: string[]) => void;
+  textColor: string;
+  mutedColor: string;
+  accentColor: string;
+  renderAfterItem?: (item: ListItemRow) => ReactNode;
+}) {
+  const ids = items.map((i) => i.id);
+  const idsKey = ids.join(',');
+  const positions = useSharedValue<Record<string, number>>({});
+  const layout = useSharedValue<Record<string, RowLayout>>({});
+  const prevKeyRef = useRef('');
+  if (prevKeyRef.current !== idsKey) {
+    const next: Record<string, number> = {};
+    ids.forEach((itemId, i) => {
+      next[itemId] = i;
+    });
+    positions.value = next;
+    prevKeyRef.current = idsKey;
+  }
 
   return (
-    <Swipeable
-      overshootLeft={false}
-      renderLeftActions={() => (
-        <Pressable onPress={onNestAction} style={styles.nestAction}>
-          <Ionicons name={isNested ? 'return-up-back-outline' : 'arrow-forward-outline'} size={18} color="#fff" />
-        </Pressable>
-      )}
-    >
-      {row}
-    </Swipeable>
+    <>
+      {items.map((item, index) => (
+        <Fragment key={item.id}>
+          <ChecklistRow
+            item={item}
+            index={index}
+            originalIds={ids}
+            positions={positions}
+            layout={layout}
+            isNested={isNested}
+            canNest={computeCanNest(item, index)}
+            pillStyle={pillStyle}
+            onToggle={() => onToggle(item.id)}
+            onDelete={() => onDelete(item.id)}
+            onCommitLabel={(label) => onCommitLabel(item.id, label)}
+            onNestAction={() => onNestAction(item.id)}
+            onReorderCommit={onReorder}
+            textColor={textColor}
+            mutedColor={mutedColor}
+            accentColor={accentColor}
+          />
+          {renderAfterItem?.(item)}
+        </Fragment>
+      ))}
+    </>
   );
 }
 
@@ -113,7 +337,7 @@ export default function ListDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const { session } = useAuth();
-  const { items, addItem, updateLabel, toggleItem, deleteItem, indentItem, outdentItem, moveItem } =
+  const { items, addItem, updateLabel, toggleItem, deleteItem, indentItem, outdentItem, reorderSiblings } =
     useListItems(id);
   const { lists, updateListTitle, updateListIcon, updateListBackground } = useLists();
   const list = useMemo(() => lists.find((l) => l.id === id) ?? null, [lists, id]);
@@ -134,7 +358,9 @@ export default function ListDetailScreen() {
   const textColor = hasImage ? '#ffffff' : list?.background_color ? DARK_TEXT : theme.text;
   const mutedColor = hasImage ? 'rgba(255,255,255,0.75)' : list?.background_color ? DARK_TEXT_MUTED : theme.textSecondary;
   const accentColor = hasImage ? '#ffffff' : list?.background_color ? DARK_TEXT : theme.accent;
-  const rowPillStyle = hasImage ? { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 12, paddingHorizontal: Spacing.two } : null;
+  const rowPillStyle = hasImage
+    ? { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 12, paddingHorizontal: Spacing.two }
+    : null;
 
   const submitDraft = async () => {
     if (!draft.trim()) return;
@@ -206,53 +432,42 @@ export default function ListDetailScreen() {
       />
 
       <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
-        {topLevelUnchecked.map((item, index) => {
-          const children = childrenOf(item.id);
-          return (
-            <View key={item.id}>
-              <View style={rowPillStyle}>
-                <ChecklistRow
-                  item={item}
-                  isNested={false}
-                  canNest={index > 0 && children.length === 0}
-                  onToggle={() => toggleItem(item.id, true)}
-                  onDelete={() => deleteItem(item.id)}
-                  onCommitLabel={(label) => updateLabel(item.id, label)}
-                  onNestAction={() => indentItem(item.id)}
-                  onMoveUp={() => moveItem(item.id, 'up')}
-                  onMoveDown={() => moveItem(item.id, 'down')}
-                  canMoveUp={index > 0}
-                  canMoveDown={index < topLevelUnchecked.length - 1}
-                  textColor={textColor}
-                  mutedColor={mutedColor}
-                  accentColor={accentColor}
-                />
-              </View>
-              {children.map((child, childIndex) => (
-                <View key={child.id} style={rowPillStyle}>
-                  <ChecklistRow
-                    item={child}
-                    isNested
-                    canNest
-                    onToggle={() => toggleItem(child.id, true)}
-                    onDelete={() => deleteItem(child.id)}
-                    onCommitLabel={(label) => updateLabel(child.id, label)}
-                    onNestAction={() => outdentItem(child.id)}
-                    onMoveUp={() => moveItem(child.id, 'up')}
-                    onMoveDown={() => moveItem(child.id, 'down')}
-                    canMoveUp={childIndex > 0}
-                    canMoveDown={childIndex < children.length - 1}
-                    textColor={textColor}
-                    mutedColor={mutedColor}
-                    accentColor={accentColor}
-                  />
-                </View>
-              ))}
-            </View>
-          );
-        })}
+        <ChecklistGroup
+          items={topLevelUnchecked}
+          isNested={false}
+          pillStyle={rowPillStyle}
+          computeCanNest={(item, index) => index > 0 && childrenOf(item.id).length === 0}
+          onToggle={(itemId) => toggleItem(itemId, true)}
+          onDelete={(itemId) => deleteItem(itemId)}
+          onCommitLabel={(itemId, label) => updateLabel(itemId, label)}
+          onNestAction={(itemId) => indentItem(itemId)}
+          onReorder={(orderedIds) => reorderSiblings(orderedIds)}
+          textColor={textColor}
+          mutedColor={mutedColor}
+          accentColor={accentColor}
+          renderAfterItem={(item) => {
+            const children = childrenOf(item.id);
+            if (children.length === 0) return null;
+            return (
+              <ChecklistGroup
+                items={children}
+                isNested
+                pillStyle={rowPillStyle}
+                computeCanNest={() => true}
+                onToggle={(itemId) => toggleItem(itemId, true)}
+                onDelete={(itemId) => deleteItem(itemId)}
+                onCommitLabel={(itemId, label) => updateLabel(itemId, label)}
+                onNestAction={(itemId) => outdentItem(itemId)}
+                onReorder={(orderedIds) => reorderSiblings(orderedIds)}
+                textColor={textColor}
+                mutedColor={mutedColor}
+                accentColor={accentColor}
+              />
+            );
+          }}
+        />
 
-        <View style={[styles.row, rowPillStyle]}>
+        <View style={[rowPillStyle, styles.row]}>
           <Ionicons name="ellipse-outline" size={24} color={mutedColor} style={{ opacity: 0.6 }} />
           <TextInput
             ref={draftInputRef}
@@ -282,24 +497,17 @@ export default function ListDetailScreen() {
 
             {showChecked &&
               checked.map((item) => (
-                <View key={item.id} style={rowPillStyle}>
-                  <ChecklistRow
-                    item={item}
-                    isNested={false}
-                    canNest={false}
-                    onToggle={() => toggleItem(item.id, false)}
-                    onDelete={() => deleteItem(item.id)}
-                    onCommitLabel={(label) => updateLabel(item.id, label)}
-                    onNestAction={() => {}}
-                    onMoveUp={() => {}}
-                    onMoveDown={() => {}}
-                    canMoveUp={false}
-                    canMoveDown={false}
-                    textColor={textColor}
-                    mutedColor={mutedColor}
-                    accentColor={accentColor}
-                  />
-                </View>
+                <StaticChecklistRow
+                  key={item.id}
+                  item={item}
+                  pillStyle={rowPillStyle}
+                  onToggle={() => toggleItem(item.id, false)}
+                  onDelete={() => deleteItem(item.id)}
+                  onCommitLabel={(label) => updateLabel(item.id, label)}
+                  textColor={mutedColor}
+                  mutedColor={mutedColor}
+                  accentColor={accentColor}
+                />
               ))}
           </>
         )}
@@ -437,20 +645,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingVertical: Spacing.two,
+    paddingHorizontal: Spacing.two,
   },
   nestedRow: {
     marginLeft: Spacing.five,
-  },
-  moveButtons: {
-    justifyContent: 'center',
-  },
-  nestAction: {
-    width: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#8E8E93',
-    borderRadius: 12,
-    marginRight: Spacing.two,
   },
   rowInput: {
     flex: 1,
