@@ -1,5 +1,6 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -12,6 +13,7 @@ export default function SignInScreen() {
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const submit = async () => {
@@ -61,18 +63,29 @@ export default function SignInScreen() {
             { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.border },
           ]}
         />
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Password"
-          placeholderTextColor={theme.textSecondary}
-          secureTextEntry
-          autoCapitalize="none"
+        <View
           style={[
-            styles.input,
-            { backgroundColor: theme.backgroundElement, color: theme.text, borderColor: theme.border },
+            styles.passwordRow,
+            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
           ]}
-        />
+        >
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
+            placeholderTextColor={theme.textSecondary}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            style={[styles.passwordInput, { color: theme.text }]}
+          />
+          <Pressable onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
+            <Ionicons
+              name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+              size={20}
+              color={theme.textSecondary}
+            />
+          </Pressable>
+        </View>
 
         <Pressable
           onPress={submit}
@@ -117,6 +130,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     marginBottom: Spacing.three,
+    fontSize: 16,
+  },
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: Spacing.three,
+    marginBottom: Spacing.three,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: Spacing.three,
     fontSize: 16,
   },
   primaryButton: {

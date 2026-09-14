@@ -4,7 +4,9 @@ import { useState } from 'react';
 import {
   FlatList,
   ImageBackground,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   TextInput,
@@ -114,7 +116,10 @@ export default function ListsScreen() {
       />
 
       <Modal visible={modalVisible} animationType="slide" transparent onRequestClose={() => setModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
           <ThemedView style={styles.modalCard} type="background">
             <ThemedText type="subtitle" style={{ fontSize: 20, marginBottom: Spacing.three }}>
               New list
@@ -174,7 +179,7 @@ export default function ListsScreen() {
               </Pressable>
             </View>
           </ThemedView>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
